@@ -30,7 +30,8 @@
 package unbound
 
 /*
-#cgo LDFLAGS: -lunbound
+#cgo LDFLAGS: -L/usr/local/lib -lunbound
+#cgo CFLAGS: -I/usr/local/include
 #include <stdlib.h>
 #include <stdio.h>
 #include <unbound.h>
