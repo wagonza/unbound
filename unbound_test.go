@@ -3,6 +3,8 @@ package unbound
 import (
 	"fmt"
 	"github.com/miekg/dns"
+	"runtime"
+	"sync"
 	"testing"
 )
 
@@ -92,4 +94,37 @@ func TestUnicodeResolve(t *testing.T) {
 		t.Log("Failure to get the A for ☁→❄→☃→☀→☺→☂→☹→✝.ws.")
 		t.Fail()
 	}
+}
+
+func TestStress(t *testing.T) {
+	domains := []string{"www.google.com.", "www.isc.org.", "www.outlook.com.", "miek.nl.", "doesnotexist.miek.nl."}
+	l := len(domains)
+	max := 8
+	procs := runtime.GOMAXPROCS(max)
+	wg := new(sync.WaitGroup)
+	wg.Add(max)
+	u := New()
+	defer u.Destroy()
+	if err := u.ResolvConf("/etc/resolv.conf"); err != nil {
+		return
+	}
+	for i := 0; i < max; i++ {
+		go func() {
+			for i := 0; i < 100; i++ {
+				d := domains[int(dns.Id()) % l]
+				r, err := u.Resolve(d, dns.TypeA, dns.ClassINET)
+				if err != nil {
+					t.Log("failure to resolve: " + d)
+					continue
+				}
+				if !r.HaveData && d != "doesnotexist.miek.nl." {
+					t.Log("no data when resolving: " + d)
+					continue
+				}
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	runtime.GOMAXPROCS(procs)
 }
